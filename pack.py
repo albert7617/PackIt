@@ -46,6 +46,7 @@ class FolderListWidget(QtWidgets.QListWidget):
         self.setDragDropMode(QAbstractItemView.DragDrop)
         self.setDefaultDropAction(QtCore.Qt.MoveAction)
         self.setDropIndicatorShown(True)
+        self.setSelectionMode(QtWidgets.QAbstractItemView.MultiSelection)
 
     def dragEnterEvent(self, event):
         if event.mimeData().hasUrls:
@@ -69,8 +70,30 @@ class FolderListWidget(QtWidgets.QListWidget):
 
     def keyPressEvent(self, event):
         if event.key() == QtCore.Qt.Key_Delete:
-            if self.count() > 0:
-                self.takeItem(self.row(self.selectedItems()[0]))
+            for item in self.selectedItems():
+                self.takeItem(self.row(item))
+        if event.key() == QtCore.Qt.Key_A and event.modifiers() == QtCore.Qt.ControlModifier:
+            self.selectAll()
+
+    def mousePressEvent(self, event):
+        item = self.itemAt(event.pos())
+        if item is None:
+            print("Clicked on blank space")
+        else:
+            self.clearSelection()
+            print(f"Clicked on item: {item.text()}")
+        super(FolderListWidget, self).mousePressEvent(event)
+
+    
+    def mouseDoubleClickEvent(self, event):
+        item = self.itemAt(event.pos())
+        if item is None:
+            self.selectAll()
+            for item in self.selectedItems():
+                self.takeItem(self.row(item))
+        else:
+            print(f"Double-clicked on item: {item.text()}")
+        super(FolderListWidget, self).mouseDoubleClickEvent(event)
 
 class Worker(QtCore.QObject):
     finished = QtCore.pyqtSignal()
