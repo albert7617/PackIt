@@ -127,22 +127,22 @@ class CopyProgressDiaglog(QtWidgets.QWidget):
         self.setLayout(self.layout)
         self.setGeometry(popup_x, popup_y, popup_width, popup_height)
         self.setWindowTitle('Progress Bar')
-        # self.show()
 
         self.obj = Worker(src, dst)
-        self.thread = QtCore.QThread()
         self.obj.initProg.connect(self.on_count_init)
         self.obj.tickProg.connect(self.on_count_changed)
-        self.obj.moveToThread(self.thread)
-        self.obj.finished.connect(self.thread.quit)
-        self.obj.finished.connect(self.hide)  # To hide the progress bar after the progress is completed
-        self.thread.started.connect(self.obj.copyWork)
-        # self.thread.start()  # This was moved to start_progress
+        self.obj.moveToThread(copyThread)
+        copyThread.started.connect(self.obj.copyWork)
 
     def start_progress(self):  # To restart the progress every time
         self.show()
-        self.thread.start()
-        # self.thread.join()
+        copyThread.start()
+        msg = QMessageBox()
+        msg.setText("Done")
+        msg.setWindowTitle("Info")
+        msg.setStandardButtons(QMessageBox.Ok)
+        QtWidgets.QApplication.beep()
+        msg.exec_()
 
     def on_count_changed(self, value):
         self.pbar.setValue(value)
@@ -206,18 +206,11 @@ class Ui_MainWindow(object):
             copyDiaglog = CopyProgressDiaglog(src, dst)
             copyDiaglog.start_progress()
 
-            msg = QMessageBox()
-            msg.setText("Done")
-            msg.setWindowTitle("Info")
-            msg.setStandardButtons(QMessageBox.Ok)
-            QtWidgets.QApplication.beep()
-            msg.exec_()
-
-
 if __name__ == "__main__":
     import sys
     app = QtWidgets.QApplication(sys.argv)
     MainWindow = QtWidgets.QMainWindow()
+    copyThread = QtCore.QThread()
     ui = Ui_MainWindow()
     ui.setupUi(MainWindow)
     MainWindow.show()
