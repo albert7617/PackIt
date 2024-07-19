@@ -72,6 +72,84 @@ class FolderListWidget(QtWidgets.QListWidget):
             if self.count() > 0:
                 self.takeItem(self.row(self.selectedItems()[0]))
 
+class Worker(QtCore.QObject):
+    finished = QtCore.pyqtSignal()
+    initProg = QtCore.pyqtSignal(int)
+    tickProg = QtCore.pyqtSignal(int)
+
+    def __init__(self, src, dst):
+        super().__init__()
+        self.src = src
+        self.dst = dst
+
+    @QtCore.pyqtSlot()
+    def copyWork(self):  # A slot takes no params
+        fileName = 1
+        for srcPath in self.src:
+            for dirPath, dirNames, fileNames in walk(srcPath):
+                for f in fileNames:
+                    fileName += 1
+
+        self.initProg.emit(fileName)
+
+        fileName = 1
+        for srcPath in self.src:
+            for dirPath, dirNames, fileNames in walk(srcPath):
+                fileNames = natsorted(fileNames)
+                for f in fileNames:
+                    copy2(path.join(dirPath, f), path.join(self.dst, str(fileName).zfill(3) + path.splitext(f)[1]))
+                    fileName += 1
+
+            self.tickProg.emit(fileName)
+
+        self.finished.emit()
+
+
+class CopyProgressDiaglog(QtWidgets.QWidget):
+
+    def __init__(self, src, dst):
+        super().__init__()
+        self.src = src
+        self.dst = dst
+
+        main_center_x = MainWindow.pos().x() + MainWindow.size().width() / 2
+        main_center_y = MainWindow.pos().y() + MainWindow.size().height() / 2
+
+        popup_width = 550
+        popup_height = 100
+        popup_x = int(main_center_x - popup_width / 2)
+        popup_y = int(main_center_y - popup_height / 2)
+
+        self.pbar = QtWidgets.QProgressBar(self)
+        self.pbar.setGeometry(30, 40, 500, 75)
+        self.layout = QtWidgets.QVBoxLayout()
+        self.layout.addWidget(self.pbar)
+        self.setLayout(self.layout)
+        self.setGeometry(popup_x, popup_y, popup_width, popup_height)
+        self.setWindowTitle('Progress Bar')
+        # self.show()
+
+        self.obj = Worker(src, dst)
+        self.thread = QtCore.QThread()
+        self.obj.initProg.connect(self.on_count_init)
+        self.obj.tickProg.connect(self.on_count_changed)
+        self.obj.moveToThread(self.thread)
+        self.obj.finished.connect(self.thread.quit)
+        self.obj.finished.connect(self.hide)  # To hide the progress bar after the progress is completed
+        self.thread.started.connect(self.obj.copyWork)
+        # self.thread.start()  # This was moved to start_progress
+
+    def start_progress(self):  # To restart the progress every time
+        self.show()
+        self.thread.start()
+        # self.thread.join()
+
+    def on_count_changed(self, value):
+        self.pbar.setValue(value)
+    
+    def on_count_init(self, value):
+        self.pbar.setRange(0, value)
+
 
 class Ui_MainWindow(object):
 
@@ -123,18 +201,16 @@ class Ui_MainWindow(object):
     def runButtonClick(self):
         destination = self.lineEdit.text()
         if path.isdir(destination):
-            fileName = 1
-            for i in range(self.listWidget.count()):
-                for dirPath, dirNames, fileNames in walk(self.listWidget.item(i).text()):
-                    fileNames = natsorted(fileNames)
-                    for f in fileNames:
-                        copy2(path.join(dirPath, f), path.join(destination, str(fileName).zfill(3) + path.splitext(f)[1]))
-                        fileName += 1
+            src = [self.listWidget.item(i).text() for i in range(self.listWidget.count())]
+            dst = destination
+            copyDiaglog = CopyProgressDiaglog(src, dst)
+            copyDiaglog.start_progress()
 
             msg = QMessageBox()
             msg.setText("Done")
             msg.setWindowTitle("Info")
             msg.setStandardButtons(QMessageBox.Ok)
+            QtWidgets.QApplication.beep()
             msg.exec_()
 
 
