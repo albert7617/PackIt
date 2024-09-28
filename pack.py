@@ -224,10 +224,20 @@ class Ui_MainWindow(object):
     def runButtonClick(self):
         destination = self.lineEdit.text()
         if path.isdir(destination):
-            src = [self.listWidget.item(i).text() for i in range(self.listWidget.count())]
-            dst = destination
-            copyDiaglog = CopyProgressDiaglog(src, dst)
-            copyDiaglog.start_progress()
+            fileName = 1
+            for i in range(self.listWidget.count()):
+                for dirPath, dirNames, fileNames in walk(self.listWidget.item(i).text()):
+                    fileNames = natsorted(fileNames)
+                    for f in fileNames:
+                        copy2(path.join(dirPath, f), path.join(destination, str(fileName).zfill(3) + path.splitext(f)[1]))
+                        fileName += 1
+
+            msg = QMessageBox()
+            msg.setText("Done")
+            msg.setWindowTitle("Info")
+            msg.setStandardButtons(QMessageBox.Ok)
+            QtWidgets.QApplication.beep()
+            msg.exec_()
 
 if __name__ == "__main__":
     import sys
